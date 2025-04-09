@@ -1,0 +1,30 @@
+[project]
+name = "llm-knowledge-search"
+version = "0.1.0"
+description = "Semantic search over a Neo4j knowledge graph using LLMs"
+authors = [{ name = "Nicolás Espinoza", email = "nespinov@uc.cl" }]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "openai>=1.0",
+    "neo4j>=5.17",
+    "python-dotenv>=1.0",
+    "typer>=0.9",
+    "pydantic>=2.6",
+    "langchain>=0.1.13",
+    "langchain-openai>=0.0.8",
+    "memgraph>=0.0.1",
+    "scikit-learn>=1.6.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+]
+# Puedes dejar esto vacío o usarlo más adelante para configuraciones especiales
