@@ -131,9 +131,9 @@ if __name__ == '__main__':
 
     load_dotenv()
 
-    uri = "neo4j://ia-dev.tecnoandina.cl:7687"
-    user = "neo4j"
-    password = "12345678"
+    uri = os.getenv("NEO4J_URI")
+    user = os.getenv("NEO4J_USER")
+    password = os.getenv("NEO4J_PASSWORD")
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
     if not all([uri, user, password, openai_api_key]):
