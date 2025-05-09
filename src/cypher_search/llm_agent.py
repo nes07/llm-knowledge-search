@@ -8,7 +8,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class LLMAgent:
-    def __init__(self, api_key: str, model_name: str = "gpt-4-turbo-preview"):
+    def __init__(self, api_key: str, model_name: str = "gpt-4o"):
         self.client = OpenAI(api_key=api_key)
         self.model_name = model_name
 

@@ -13,22 +13,25 @@ def get_concept_nodes(graph_connection: Neo4jConnection) -> List[Dict[str, Any]]
 
 def get_instance_names_by_concept(graph_connection: Neo4jConnection) -> Dict[str, List[str]]:
     """
-    Extrae los nombres de todas las instancias para cada nodo concepto.
-    Ahora busca nodos que tienen una relación INSTANCIATED_FROM *hacia* el nodo concepto.
-    Assumes instances have a 'name' property.
+    Extrae los nombres de todos los nodos que comparten la etiqueta con cada nodo Concept.
+    Assumes Concept nodes have a 'name' property indicating the shared label.
+    Assumes instance nodes have a 'name' property.
     """
     concept_nodes = get_concept_nodes(graph_connection)
     instance_names_by_concept = {}
     for concept_node in concept_nodes:
+        concept_name = concept_node['n'].get('name')
         concept_id = concept_node['n'].get('id')
-        if concept_id:
+        if concept_name:
             query = f"""
-            MATCH (instance)-[:INSTANCIATED_FROM]->(concept)
-            WHERE id(concept) = $concept_id AND exists(instance.name)
+            MATCH (instance)
+            WHERE $concept_name IN labels(instance) AND instance.name IS NOT NULL
             RETURN DISTINCT instance.name AS instance_name
             """
-            results = graph_connection.fetch_all(query, {"concept_id": concept_id})
+            results = graph_connection.fetch_all(query, {"concept_name": concept_name})
             instance_names_by_concept[concept_id] = [res.get('instance_name') for res in results if res.get('instance_name')]
+        else:
+            instance_names_by_concept[concept_id] = []
     return instance_names_by_concept
 
 def get_concept_nodes_with_relationships(graph_connection: Neo4jConnection) -> List[Dict[str, Any]]:
@@ -43,18 +46,19 @@ def get_concept_nodes_with_relationships(graph_connection: Neo4jConnection) -> L
 
 def get_one_instance_per_concept_by_name(graph_connection: Neo4jConnection) -> Dict[str, Dict[str, Any]]:
     """
-    Extrae una instancia por cada nodo concepto para conocer sus campos.
-    Ahora busca un nodo que tiene una relación INSTANCIATED_FROM *hacia* el nodo concepto usando el nombre.
-    Retorna un diccionario donde la clave es el nombre del concepto y el valor es el diccionario de propiedades de la instancia.
+    Extrae una instancia de cada tipo de nodo that shares a label with each Concept node para conocer sus campos.
+    Assumes Concept nodes have a 'name' property indicating the shared label.
     """
     concept_nodes = get_concept_nodes(graph_connection)
     one_instance_per_concept = {}
     for concept_node in concept_nodes:
-        concept_name = concept_node['n'].get('name')
+        concept_name = concept_node['n'].get('name')  # Assuming 'name' property holds the shared label
+        concept_id = concept_node['n'].get('id')
         print(f"Buscando instancia para concepto: {concept_name}")
         if concept_name:
             query = f"""
-            MATCH (instance)-[:INSTANCIATED_FROM]->(concept:Concept {{name: $concept_name}})
+            MATCH (instance)
+            WHERE $concept_name IN labels(instance)
             RETURN instance
             LIMIT 1
             """
@@ -64,6 +68,9 @@ def get_one_instance_per_concept_by_name(graph_connection: Neo4jConnection) -> D
                 one_instance_per_concept[concept_name] = one_instance if one_instance else {}
             else:
                 one_instance_per_concept[concept_name] = {}
+                print(f"No se encontró instancia para concepto: {concept_name}")
+        else:
+            one_instance_per_concept[concept_name] = {}
     return one_instance_per_concept
 
 def get_graph_schema(graph_connection: Neo4jConnection) -> List[Dict[str, Any]]:

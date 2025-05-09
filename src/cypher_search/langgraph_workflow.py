@@ -47,9 +47,11 @@ def generate_query(state: GraphState):
 
 def execute_query(state: GraphState):
     query = state.get("cypher_query")
+    print("Query:", query)
     graph_connection = state.get("graph_connection")
     try:
         results = graph_connection.execute_and_fetch(query)
+        print('Results:', results)
         return {"query_result": results, "error": None}
     except CypherSyntaxError as e:
         return {"query_result": None, "error": str(e)}
@@ -107,15 +109,14 @@ def create_langgraph_workflow():
         },
     )
 
-    workflow.add_edge("increment_retry_count", "generate_query") # Volver a generar la query
+    workflow.add_edge("increment_retry_count", "generate_query")
 
-    # Aristas condicionales para el reintento (desde execute_query)
     workflow.add_conditional_edges(
         "execute_query",
         lambda state: "retry" if state.get("retry_count", 0) < MAX_RETRIES and state.get("error") else "final_response",
         {
             "retry": "increment_retry_count",
-            "final_response": "final_response", # Directamente a final_response si no retry
+            "final_response": "final_response",
         },
     )
 
@@ -130,7 +131,6 @@ if __name__ == '__main__':
     from dotenv import load_dotenv
 
     load_dotenv()
-
     uri = os.getenv("NEO4J_URI")
     user = os.getenv("NEO4J_USER")
     password = os.getenv("NEO4J_PASSWORD")
