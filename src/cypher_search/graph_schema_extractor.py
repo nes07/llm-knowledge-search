@@ -54,7 +54,7 @@ def get_one_instance_per_concept_by_name(graph_connection: Neo4jConnection) -> D
     for concept_node in concept_nodes:
         concept_name = concept_node['n'].get('name')  # Assuming 'name' property holds the shared label
         concept_id = concept_node['n'].get('id')
-        print(f"Buscando instancia para concepto: {concept_name}")
+        # print(f"Buscando instancia para concepto: {concept_name}")
         if concept_name:
             query = f"""
             MATCH (instance)
@@ -68,7 +68,7 @@ def get_one_instance_per_concept_by_name(graph_connection: Neo4jConnection) -> D
                 one_instance_per_concept[concept_name] = one_instance if one_instance else {}
             else:
                 one_instance_per_concept[concept_name] = {}
-                print(f"No se encontró instancia para concepto: {concept_name}")
+                # print(f"No se encontró instancia para concepto: {concept_name}")
         else:
             one_instance_per_concept[concept_name] = {}
     return one_instance_per_concept

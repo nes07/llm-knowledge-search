@@ -56,7 +56,7 @@ class LLMAgent:
 
         Solo devuelve la consulta Cypher. No incluyas explicaciones ni texto adicional.
         """
-        print(prompt)
+        # print(prompt)
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
@@ -70,5 +70,5 @@ class LLMAgent:
                 return match.group(1)
             return cypher_query
         except Exception as e:
-            print(f"Error al contactar al LLM: {e}")
+            # print(f"Error al contactar al LLM: {e}")
             return ""

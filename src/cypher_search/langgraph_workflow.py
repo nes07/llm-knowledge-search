@@ -47,11 +47,11 @@ def generate_query(state: GraphState):
 
 def execute_query(state: GraphState):
     query = state.get("cypher_query")
-    print("Query:", query)
+    print(f"\n🔍 Consulta Cypher generada: {query}")
     graph_connection = state.get("graph_connection")
     try:
         results = graph_connection.execute_and_fetch(query)
-        print('Results:', results)
+        # print('Results:', results)
         return {"query_result": results, "error": None}
     except CypherSyntaxError as e:
         return {"query_result": None, "error": str(e)}
@@ -60,23 +60,13 @@ def execute_query(state: GraphState):
     except Exception as e:
         return {"query_result": None, "error": f"Error al ejecutar la consulta: {e}"}
 
-def review_query(state: GraphState):
-    return review_query_agent.invoke(state)
-
 def explain_results(state: GraphState):
-    return explain_results_agent.invoke(state)
-
-def check_query_error_condition(state: GraphState):
-    return "review" if state.get("error") else "explain"
-
-def check_execution_result_condition(state: GraphState):
-    if state.get("error"):
-        return {"__next__": "increment_retry_count"}
+    # Si hay resultados, usar el agente explicador, sino devolver mensaje por defecto
+    if state.get("query_result"):
+        result = explain_results_agent.invoke(state)
+        return {"final_answer": result.get("final_answer", "Resultados procesados correctamente.")}
     else:
-        return {"__next__": "explain_results"}
-
-def should_retry_condition(state: GraphState):
-    return "retry" if state.get("retry_count", 0) < MAX_RETRIES and state.get("error") else "respond"
+        return {"final_answer": "No se encontraron resultados para la consulta."}
 
 def increment_retry_count(state: GraphState):
     return {"retry_count": state.get("retry_count", 0) + 1}
@@ -89,37 +79,29 @@ def create_langgraph_workflow():
 
     workflow.add_node("generate_query", generate_query)
     workflow.add_node("execute_query", execute_query)
-    workflow.add_node("check_execution_result", check_execution_result_condition)
-    workflow.add_node("review_query", review_query)
     workflow.add_node("explain_results", explain_results)
     workflow.add_node("final_response", final_response)
     workflow.add_node("increment_retry_count", increment_retry_count)
 
     workflow.set_entry_point("generate_query")
 
+    # Flujo principal
     workflow.add_edge("generate_query", "execute_query")
-    workflow.add_edge("execute_query", "check_execution_result")
-
-    workflow.add_conditional_edges(
-        "check_execution_result",
-        lambda state: "error" if state.get("error") else "success",
-        {
-            "success": "explain_results",
-            "error": "increment_retry_count",
-        },
-    )
-
-    workflow.add_edge("increment_retry_count", "generate_query")
-
+    
+    # Después de ejecutar query, decidir si hay error o éxito
     workflow.add_conditional_edges(
         "execute_query",
-        lambda state: "retry" if state.get("retry_count", 0) < MAX_RETRIES and state.get("error") else "final_response",
+        lambda state: "error" if state.get("error") and state.get("retry_count", 0) < MAX_RETRIES else "success",
         {
-            "retry": "increment_retry_count",
-            "final_response": "final_response",
+            "error": "increment_retry_count",
+            "success": "explain_results",
         },
     )
 
+    # Después de incrementar retry, volver a generar query
+    workflow.add_edge("increment_retry_count", "generate_query")
+    
+    # Después de explicar resultados, ir a respuesta final
     workflow.add_edge("explain_results", "final_response")
 
     app = workflow.compile()
@@ -130,14 +112,22 @@ if __name__ == '__main__':
     import os
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # Cargar .env desde la raíz del proyecto
+    load_dotenv(dotenv_path='../../.env')
     uri = os.getenv("NEO4J_URI")
     user = os.getenv("NEO4J_USER")
     password = os.getenv("NEO4J_PASSWORD")
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
+    print(f"Credenciales Neo4j:")
+    print(f"  URI: {uri}")
+    print(f"  User: {user}")
+    print(f"  Password: {'*' * len(password) if password else 'None'}")
+    print(f"  OpenAI API Key: {'*' * 10 + openai_api_key[-4:] if openai_api_key else 'None'}")
+
     if not all([uri, user, password, openai_api_key]):
-        print("Por favor, configura las variables de entorno NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD y OPENAI_API_KEY en tu .env file.")
+        # print("Por favor, configura las variables de entorno NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD y OPENAI_API_KEY en tu .env file.")
+        pass
     else:
         graph_connection = Neo4jConnection(uri, user, password)
         llm_agent = LLMAgent(api_key=openai_api_key)
@@ -162,13 +152,38 @@ if __name__ == '__main__':
                 "graph_connection": graph_connection,
             }
             output = workflow.invoke(inputs)
-            return output.get("final_answer", "No se pudo obtener una respuesta.")
+            
+            # Retornar información completa
+            return {
+                "answer": output.get("final_answer", "No se pudo obtener una respuesta."),
+                "cypher_query": output.get("cypher_query", "No se generó consulta"),
+                "query_result": output.get("query_result", []),
+                "error": output.get("error", None)
+            }
 
         while True:
             pregunta_usuario = input("\nIngresa tu pregunta (o escribe 'salir' para terminar): ")
             if pregunta_usuario.lower() == 'salir':
                 break
 
-            respuesta = run_search(pregunta_usuario)
-            print("\nRespuesta:")
-            print(respuesta)
+            resultado = run_search(pregunta_usuario)
+            
+            print("\n" + "="*60)
+            print("📊 RESULTADOS DE LA BÚSQUEDA")
+            print("="*60)
+            
+            if resultado["error"]:
+                print(f"❌ Error: {resultado['error']}")
+            
+            print(f"\n📝 Consulta Cypher:")
+            print(f"   {resultado['cypher_query']}")
+            
+            print(f"\n📈 Resultados encontrados: {len(resultado['query_result'])}")
+            
+            print(f"\n💬 Respuesta del agente:")
+            print(f"   {resultado['answer']}")
+            
+            if resultado['query_result'] and len(resultado['query_result']) <= 5:
+                print(f"\n🔍 Datos brutos (primeros resultados):")
+                for i, item in enumerate(resultado['query_result'][:5], 1):
+                    print(f"   {i}. {item}")

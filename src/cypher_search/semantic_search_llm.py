@@ -33,23 +33,31 @@ def semantic_search_using_llm(graph_connection: Neo4jConnection, user_question: 
     )
 
     if cypher_query:
-        print(f"Consulta Cypher generada por el LLM: {cypher_query}")
+        # print(f"Consulta Cypher generada por el LLM: {cypher_query}")
         results = graph_connection.execute_and_fetch(cypher_query)
         return results
     else:
-        print("No se pudo generar una consulta Cypher.")
+        # print("No se pudo generar una consulta Cypher.")
         return []
 
 if __name__ == '__main__':
-    load_dotenv()
+    # Cargar .env desde la raíz del proyecto
+    load_dotenv(dotenv_path='../../.env')
 
-    uri = "neo4j://ia-dev.tecnoandina.cl:7687"
-    user = "neo4j"
-    password = "12345678"
+    uri = os.getenv("NEO4J_URI")
+    user = os.getenv("NEO4J_USER")
+    password = os.getenv("NEO4J_PASSWORD")
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
+    print(f"Credenciales Neo4j (semantic_search_llm.py):")
+    print(f"  URI: {uri}")
+    print(f"  User: {user}")
+    print(f"  Password: {'*' * len(password) if password else 'None'}")
+    print(f"  OpenAI API Key: {'*' * 10 + openai_api_key[-4:] if openai_api_key else 'None'}")
+
     if not all([uri, user, password, openai_api_key]):
-        print("Por favor, configura las variables de entorno NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD y OPENAI_API_KEY en tu .env file.")
+        # print("Por favor, configura las variables de entorno NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD y OPENAI_API_KEY en tu .env file.")
+        pass
     else:
         graph_connection = Neo4jConnection(uri, user, password)
         llm_agent = LLMAgent(api_key=openai_api_key)
